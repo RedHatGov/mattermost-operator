@@ -2,7 +2,7 @@
 
 - name: Generate Database Password
   set_fact:
-    database: "{{ database | combine({'password': lookup('password', '/dev/null length=15 chars=ascii_letters')}) }}"
+    database: "{{ database | default({}) | combine({'password': lookup('password', '/dev/null length=15 chars=ascii_letters')}) }}"
   when: database.password is undefined
 
 - name: Create Postgres Database Secret

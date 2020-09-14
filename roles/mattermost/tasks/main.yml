@@ -1,13 +1,8 @@
 ---
 
-- name: Generate Database Password
-  set_fact:
-    database: "{{ database | combine({'password': lookup('password', '/dev/null length=15 chars=ascii_letters')}) }}"
-  when: database.password is undefined
-
 - name: Generate Database URL
   set_fact:
-    database: "{{ database | combine({'url': ansible_operator_meta.name + '-mattermost-' + database.drivername }) }}"
+    database: "{{ database | default({}) | combine({'url': ansible_operator_meta.name + '-mattermost-' + database.drivername }) }}"
   when: database.url is undefined
 
 - name: Create Mattermost Database Secret
@@ -93,7 +88,7 @@
   
   - name: Set Mattermost URL variable
     set_fact:
-      mattermost: "{{ mattermost | combine({'url': mattermost_route.resources[0].spec.host }) }}"
+      mattermost: "{{ mattermost | default({}) | combine({'url': 'https://' + mattermost_route.resources[0].spec.host }) }}"
   when: mattermost.url is not defined
 
 - name: Start Mattermost
