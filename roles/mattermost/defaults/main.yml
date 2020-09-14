@@ -1,0 +1,6 @@
+---
+database:
+  drivername: postgres
+  username: mattermost
+  port: 5432
+  name: mattermost

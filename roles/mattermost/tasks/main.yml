@@ -1,0 +1,197 @@
+---
+
+- name: Generate Database Password
+  set_fact:
+    database: "{{ database | combine({'password': lookup('password', '/dev/null length=15 chars=ascii_letters')}) }}"
+  when: database.password is undefined
+
+- name: Generate Database URL
+  set_fact:
+    database: "{{ database | combine({'url': ansible_operator_meta.name + '-mattermost-' + database.drivername }) }}"
+  when: database.url is undefined
+
+- name: Create Mattermost Database Secret
+  community.kubernetes.k8s:
+    definition:
+      kind: Secret
+      apiVersion: v1
+      metadata:
+        name: mattermost-database
+        namespace: '{{ ansible_operator_meta.namespace }}'
+      data:
+        mattermost_datasource: '{{ (database.drivername, "://", database.username, ":", database.password, "@", database.url, ":", database.port, "/", database.name, "?sslmode=disable&connect_timeout=10") | join() | b64encode }}'
+
+# TODO: We do this, this way for now, probably not the best as we parameterize volumes more
+- name: Create Mattermost Volumes
+  community.kubernetes.k8s:
+    definition:
+      kind: PersistentVolumeClaim
+      apiVersion: v1
+      metadata:
+        name: '{{ ansible_operator_meta.name }}-mattermost-{{ item.volume }}'
+        namespace: '{{ ansible_operator_meta.namespace }}'
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: '{{ item.size }}'
+        volumeMode: Filesystem
+  loop:
+  - { volume: config, size: "{{ mattermost.configStorage.persistentVolumeSize | default() }}" }
+  - { volume: logs, size: "{{ mattermost.logStorage.persistentVolumeSize | default() }}" }
+  - { volume: data, size: "{{ mattermost.dataStorage.persistentVolumeSize | default() }}" }
+  - { volume: plugin, size: "{{ mattermost.pluginStorage.persistentVolumeSize | default() }}" }
+  when: item.size | length > 0
+
+- name: Create Mattermost Service 
+  community.kubernetes.k8s:
+    definition:
+      kind: Service
+      apiVersion: v1
+      metadata:
+        name: '{{ ansible_operator_meta.name }}-mattermost'
+        namespace: '{{ ansible_operator_meta.namespace }}'
+      spec:
+        ports:
+          - name: 8065-tcp
+            protocol: TCP
+            port: 80
+            targetPort: 8065
+        selector:
+          name: mattermost
+        type: ClusterIP
+
+- name: Create Mattermost Route
+  community.kubernetes.k8s:
+    definition:
+      kind: Route
+      apiVersion: route.openshift.io/v1
+      metadata:
+        name: '{{ ansible_operator_meta.name }}-mattermost'
+        namespace: '{{ ansible_operator_meta.namespace }}'
+      spec:
+        to:
+          kind: Service
+          name: '{{ ansible_operator_meta.name }}-mattermost'
+          weight: 100
+        port:
+          targetPort: 8065-tcp
+        tls:
+          termination: edge
+        wildcardPolicy: None
+
+- name: Get/Set Mattermost URL info
+  block:
+  - name: Get Mattermost URL
+    community.kubernetes.k8s_info:
+      kind: Route
+      api_version: route.openshift.io/v1
+      name: '{{ ansible_operator_meta.name }}-mattermost'
+      namespace: '{{ ansible_operator_meta.namespace }}'
+    register: mattermost_route
+  
+  - name: Set Mattermost URL variable
+    set_fact:
+      mattermost: "{{ mattermost | combine({'url': mattermost_route.resources[0].spec.host }) }}"
+  when: mattermost.url is not defined
+
+- name: Start Mattermost
+  community.kubernetes.k8s:
+    definition: |-
+      kind: Deployment
+      apiVersion: apps/v1
+      metadata:
+        name: '{{ ansible_operator_meta.name }}-mattermost'
+        namespace: '{{ ansible_operator_meta.namespace }}'
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            name: mattermost
+        template:
+          metadata:
+            creationTimestamp: null
+            labels:
+              name: mattermost
+          spec:
+            volumes:
+              - name: config
+                {% if mattermost.configStorage.persistentVolumeSize is defined %}
+                persistentVolumeClaim:
+                  claimName: '{{ ansible_operator_meta.name }}-mattermost-config'
+                {% endif %}
+
+              - name: logs
+                {% if mattermost.logStorage.persistentVolumeSize is defined %}
+                persistentVolumeClaim:
+                  claimName: '{{ ansible_operator_meta.name }}-mattermost-logs'
+                {% endif %}
+
+              - name: data
+                {% if mattermost.dataStorage.persistentVolumeSize is defined %}
+                persistentVolumeClaim:
+                  claimName: '{{ ansible_operator_meta.name }}-mattermost-data'
+                {% endif %}
+
+              - name: plugins
+                {% if mattermost.pluginStorage.persistentVolumeSize is defined %}
+                persistentVolumeClaim:
+                  claimName: '{{ ansible_operator_meta.name }}-mattermost-plugins'
+                {% endif %}
+                
+            containers:
+              - resources:
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+                  requests:
+                    cpu: 250m
+                    memory: 128Mi
+                readinessProbe:
+                  httpGet:
+                    path: /
+                    port: 8065
+                    scheme: HTTP
+                  initialDelaySeconds: 5
+                  timeoutSeconds: 1
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                terminationMessagePath: /dev/termination-log
+                name: mattermost
+                livenessProbe:
+                  httpGet:
+                    path: /
+                    port: 8065
+                    scheme: HTTP
+                  timeoutSeconds: 1
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                env:
+                  - name: MM_SERVICESETTINGS_SITEURL
+                    value: '{{ mattermost.url }}'
+                  - name: MM_SQLSETTINGS_DRIVERNAME
+                    value: '{{ database.drivername }}'
+                  - name: MM_SQLSETTINGS_DATASOURCE
+                    valueFrom:
+                      secretKeyRef:
+                        key: mattermost_datasource
+                        name: mattermost-database
+                ports:
+                  - containerPort: 8065
+                    protocol: TCP
+                imagePullPolicy: Always
+                volumeMounts:
+                  - name: config
+                    mountPath: /mattermost/config
+                  - name: logs
+                    mountPath: /mattermost/logs
+                  - name: data
+                    mountPath: /mattermost/data
+                  - name: plugins
+                    mountPath: /mattermost/plugins
+                terminationMessagePolicy: File
+                image: mattermost/mattermost-team-edition
+            restartPolicy: Always

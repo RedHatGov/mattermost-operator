@@ -1,0 +1,8 @@
+apiVersion: mattermost.gpte.opentlc.com/v1alpha1
+kind: Mattermost
+metadata:
+  name: mattermost-sample
+spec:
+  database:
+    password: mattermost
+    url: mattermost-postgresql.mattermost.svc

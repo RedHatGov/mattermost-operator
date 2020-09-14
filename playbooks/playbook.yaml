@@ -1,0 +1,12 @@
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  - name: Setup Postgres
+    include_role:
+      name: postgres
+      # TODO: SUPER TEMPORARY
+      defaults_from: ../../mattermost/defaults
+    when: database.url is undefined
+  - name: Setup Mattermost
+    include_role:
+      name: mattermost

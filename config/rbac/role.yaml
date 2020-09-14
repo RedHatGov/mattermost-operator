@@ -1,0 +1,72 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+  ##
+  ## Custom Operator Rules (Not sure this is best approach)
+  ##
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+
+  ##
+  ## Base operator rules
+  ##
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+      - pods
+      - pods/exec
+      - pods/log
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+      - daemonsets
+      - replicasets
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  ##
+  ## Rules for mattermost.gpte.opentlc.com/v1alpha1, Kind: Mattermost
+  ##
+  - apiGroups:
+      - mattermost.gpte.opentlc.com
+    resources:
+      - mattermosts
+      - mattermosts/status
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+# +kubebuilder:scaffold:rules

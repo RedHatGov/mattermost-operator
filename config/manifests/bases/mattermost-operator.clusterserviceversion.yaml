@@ -1,0 +1,46 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+    operators.operatorframework.io/builder: operator-sdk-v1.0.0
+    operators.operatorframework.io/project_layout: ansible.sdk.operatorframework.io/v1
+  name: mattermost-operator.vX.Y.Z
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions: {}
+  description: Operator to deploy Mattermost tools
+  displayName: Mattermost Operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: true
+    type: OwnNamespace
+  - supported: true
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - mattermost
+  - chat
+  - chatops
+  links:
+  - name: Mattermost Operator
+    url: https://mattermost-operator.domain
+  maintainers:
+  - email: gcollege@redhat.com
+    name: Griffin College
+  maturity: alpha
+  provider:
+    name: RedHatGov
+    url: redhatgov.io
+  version: 0.0.0

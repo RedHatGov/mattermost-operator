@@ -1,0 +1,126 @@
+---
+
+- name: Generate Database Password
+  set_fact:
+    database: "{{ database | combine({'password': lookup('password', '/dev/null length=15 chars=ascii_letters')}) }}"
+  when: database.password is undefined
+
+- name: Create Postgres Database Secret
+  community.kubernetes.k8s:
+    definition:
+      kind: Secret
+      apiVersion: v1
+      metadata:
+        name: mattermost-postgres
+        namespace: '{{ ansible_operator_meta.namespace }}'
+      data:
+        database-user: '{{ database.username | b64encode }}'
+        database-password: '{{ database.password | b64encode }}'
+        database-name: '{{ database.name | b64encode }}'
+
+- name: Start Postgres
+  community.kubernetes.k8s:
+    definition: |-
+      kind: Deployment
+      apiVersion: apps/v1
+      metadata:
+        name: '{{ ansible_operator_meta.name }}-mattermost-postgres'
+        namespace: '{{ ansible_operator_meta.namespace }}'
+        labels:
+          name: mattermost-postgres 
+      spec:
+        strategy:
+          type: Recreate
+          recreateParams:
+            timeoutSeconds: 600
+          resources: {}
+          activeDeadlineSeconds: 21600
+        triggers:
+          - type: ConfigChange
+        replicas: 1
+        revisionHistoryLimit: 10
+        test: false
+        selector:
+          matchLabels:
+            name: mattermost-postgres
+        template:
+          metadata:
+            labels:
+              name: mattermost-postgres
+          spec:
+            volumes:
+              - name: mattermost-postgres-data
+                emptyDir: {}
+            containers:
+              - resources:
+                  limits:
+                    memory: 512Mi
+                readinessProbe:
+                  exec:
+                    command:
+                      - /usr/libexec/check-container
+                  initialDelaySeconds: 5
+                  timeoutSeconds: 1
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                terminationMessagePath: /dev/termination-log
+                name: postgres
+                livenessProbe:
+                  exec:
+                    command:
+                      - /usr/libexec/check-container
+                      - '--live'
+                  initialDelaySeconds: 120
+                  timeoutSeconds: 10
+                  periodSeconds: 10
+                  successThreshold: 1
+                  failureThreshold: 3
+                env:
+                  - name: POSTGRESQL_USER
+                    valueFrom:
+                      secretKeyRef:
+                        name: mattermost-postgres
+                        key: database-user
+                  - name: POSTGRESQL_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: mattermost-postgres
+                        key: database-password
+                  - name: POSTGRESQL_DATABASE
+                    valueFrom:
+                      secretKeyRef:
+                        name: mattermost-postgres
+                        key: database-name
+                securityContext:
+                  capabilities: {}
+                  privileged: false
+                ports:
+                  - containerPort: {{ database.port }}
+                    protocol: TCP
+                imagePullPolicy: IfNotPresent
+                volumeMounts:
+                  - name: mattermost-postgres-data
+                    mountPath: /var/lib/pgsql/data
+                terminationMessagePolicy: File
+                image: registry.redhat.io/rhscl/postgresql-12-rhel7:latest 
+            restartPolicy: Always
+
+- name: Create Postgres Service
+  community.kubernetes.k8s:
+    definition: |-
+      kind: Service
+      apiVersion: v1
+      metadata:
+        name: '{{ ansible_operator_meta.name }}-mattermost-postgres'
+        namespace: '{{ ansible_operator_meta.namespace }}'
+        labels:
+          name: mattermost-postgres
+      spec:
+        ports:
+          - name: postgres
+            protocol: TCP
+            port: {{ database.port }}
+            targetPort: {{ database.port }}
+        selector:
+          name: mattermost-postgres
