@@ -39,6 +39,19 @@
   - { volume: plugin, size: "{{ mattermost.pluginStorage.persistentVolumeSize | default() }}" }
   when: item.size | length > 0
 
+# TODO: We may not want this, we may want to reference a user created secret in the future but for now we do this
+- name: Create Mattermost Keycloak secret
+  community.kubernetes.k8s:
+    definition:
+      kind: Secret
+      apiVersion: v1
+      metadata:
+        name: keycloak-secret
+        namespace: '{{ ansible_operator_meta.namespace }}'
+      data:
+        keycloak_secret: "{{ authentication.keycloak.secret | b64encode }}"
+  when: "{{ authentication.keycloak.realm_url is defined }}"
+
 - name: Create Mattermost Service 
   community.kubernetes.k8s:
     definition:
@@ -174,6 +187,26 @@
                       secretKeyRef:
                         key: mattermost_datasource
                         name: mattermost-database
+
+                  {% if authentication.keycloak.realm_url is defined %}
+                  
+                  - name: MM_GITLABSETTINGS_ENABLE
+                    value: "true"
+                  - name: MM_GITLABSETTINGS_SECRET
+                    valueFrom:
+                      secretKeyRef:
+                        key: keycloak_secret
+                        name: keycloak-secret
+                  - name: MM_GITLABSETTINGS_ID
+                    value: mattermost
+                  - name: MM_GITLABSETTINGS_AUTHENDPOINT
+                    value: "{{ authentication.keycloak.realm_url }}/protocol/openid-connect/auth"
+                  - name: MM_GITLABSETTINGS_TOKENENDPOINT
+                    value: "{{ authentication.keycloak.realm_url }}/protocol/openid-connect/token"
+                  - name: MM_GITLABSETTINGS_USERAPIENDPOINT
+                    value: "{{ authentication.keycloak.realm_url }}/protocol/openid-connect/userInfo"
+                  {% endif %}
+
                 ports:
                   - containerPort: 8065
                     protocol: TCP
