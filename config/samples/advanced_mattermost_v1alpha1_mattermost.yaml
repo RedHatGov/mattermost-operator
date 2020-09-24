@@ -15,7 +15,7 @@ spec:
     logStorage:
       persistentVolumeSize: 3Gi
     dataStorage:
-      persistentVolumeSize:5Gi
+      persistentVolumeSize: 5Gi
     pluginStorage:
       persistentVolumeSize: 1Gi
     
