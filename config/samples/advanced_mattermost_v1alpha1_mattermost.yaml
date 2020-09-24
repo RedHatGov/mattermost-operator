@@ -1,0 +1,21 @@
+apiVersion: mattermost.gpte.opentlc.com/v1alpha1
+kind: Mattermost
+metadata:
+  name: mattermost-advanced
+spec:
+  database:
+    drivername: postgres
+    name: mattermost
+    username: mattermost
+    password: mattermost
+    port: 5432
+  mattermost:
+    configStorage:
+      persistentVolumeSize: 1Gi
+    logStorage:
+      persistentVolumeSize: 3Gi
+    dataStorage:
+      persistentVolumeSize:5Gi
+    pluginStorage:
+      persistentVolumeSize: 1Gi
+    
