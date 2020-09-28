@@ -204,7 +204,7 @@
                   - name: MM_GITLABSETTINGS_TOKENENDPOINT
                     value: "{{ authentication.keycloak.realm_url }}/protocol/openid-connect/token"
                   - name: MM_GITLABSETTINGS_USERAPIENDPOINT
-                    value: "{{ authentication.keycloak.realm_url }}/protocol/openid-connect/userInfo"
+                    value: "{{ authentication.keycloak.realm_url }}/protocol/openid-connect/userinfo"
                   {% endif %}
 
                 ports:

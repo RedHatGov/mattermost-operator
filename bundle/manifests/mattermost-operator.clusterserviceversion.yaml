@@ -137,7 +137,7 @@ spec:
                 - --metrics-addr=127.0.0.1:8080
                 - --enable-leader-election
                 - --leader-election-id=mattermost-operator
-                image: quay.io/gcollege/mattermost-operator:v1.0.0
+                image: quay.io/redhatgov/mattermost-operator:v1.0.0
                 name: manager
                 resources: {}
               - args:
