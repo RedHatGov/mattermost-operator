@@ -1,4 +1,4 @@
-FROM quay.io/operator-framework/ansible-operator:v1.0.0
+FROM quay.io/operator-framework/ansible-operator:v1.6
 
 ENV ANSIBLE_HASH_BEHAVIOUR=merge \
     ANSIBLE_VERBOSITY=3

@@ -2,7 +2,11 @@ domain: gpte.opentlc.com
 layout: ansible.sdk.operatorframework.io/v1
 projectName: mattermost-operator
 resources:
-- group: mattermost
+-
+  # TODO(user): Uncomment the below line if this resource implements a controller, else delete it.
+  # controller: true
+  domain: gpte.opentlc.com
+  group: mattermost
   kind: Mattermost
   version: v1alpha1
-version: 3-alpha
+version: "3"
